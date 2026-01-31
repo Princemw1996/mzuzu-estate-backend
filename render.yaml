@@ -3,7 +3,7 @@ services:
     name: mzuzu-estate-backend
     env: node
     buildCommand: npm install
-    startCommand: node server.js
+    startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
@@ -11,5 +11,11 @@ services:
         value: 10000
       - key: JWT_SECRET
         generateValue: true
-      - key: DATABASE_URL
+      - key: DB_HOST
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_NAME
         sync: false

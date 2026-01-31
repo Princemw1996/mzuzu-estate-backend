@@ -10,59 +10,91 @@ const inquiryRoutes = require('./routes/inquiryRoutes');
 
 const app = express();
 
-const allowedOrigins = [
-  'http://localhost:3000',
-  process.env.FRONTEND_URL
-].filter(Boolean);
+// CORS configuration
+const allowedOrigins = process.env.NODE_ENV === 'production' 
+  ? ['https://mzuzu-estate-frontend.onrender.com', 'https://your-frontend-domain.com']
+  : ['http://localhost:3000'];
 
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
     }
+    return callback(null, true);
   },
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
+// Handle preflight requests
+app.options('*', cors());
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Create uploads directory
+// Request logging middleware
+if (process.env.NODE_ENV !== 'production') {
+  app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} ${req.method} ${req.url}`);
+    next();
+  });
+}
+
+// Create uploads directory if it doesn't exist
 const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-// Serve static files
+// Serve static files from uploads directory
 app.use('/uploads', express.static(uploadsDir));
 
-// Routes
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'OK',
+    message: 'Mzuzu Estate API is running',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
+// API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/properties', propertyRoutes);
 app.use('/api/inquiries', inquiryRoutes);
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
-    message: 'Mzuzu Estate API is running',
-    timestamp: new Date().toISOString()
+// Root route
+app.get('/', (req, res) => {
+  res.json({
+    message: 'Mzuzu Estate API',
+    version: '1.0.0',
+    endpoints: {
+      auth: '/api/auth',
+      properties: '/api/properties',
+      inquiries: '/api/inquiries'
+    }
   });
 });
 
-// Test endpoint
-app.get('/test', (req, res) => {
-  res.json({ message: 'Backend is working!' });
+// 404 handler
+app.use('*', (req, res) => {
+  res.status(404).json({
+    success: false,
+    message: `Route ${req.originalUrl} not found`
+  });
 });
 
-// Error handling
+// Error handler
 app.use((err, req, res, next) => {
   console.error('Error:', err.stack);
-  res.status(500).json({ 
+  res.status(500).json({
     success: false,
-    message: 'Something went wrong!',
+    message: 'Internal server error',
     error: process.env.NODE_ENV === 'development' ? err.message : undefined
   });
 });
@@ -71,5 +103,6 @@ const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📁 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🔗 Health check: http://localhost:${PORT}/health`);
 });

@@ -1,28 +1,31 @@
-const { Pool } = require('pg');
-require('dotenv').config();
+const mysql = require('mysql2');
 
-// Create PostgreSQL connection pool
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-});
+// Use environment variables for production
+const dbConfig = {
+  host: process.env.DB_HOST || 'localhost',
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || '1234',
+  database: process.env.DB_NAME || 'mzuzu_estate',
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined
+};
+
+const db = mysql.createPool(dbConfig);
 
 // Test the connection
-pool.connect((err, client, release) => {
+db.getConnection((err, connection) => {
   if (err) {
-    console.error('Error connecting to PostgreSQL:', err.message);
+    console.error('❌ Database connection error:', err.message);
+    if (process.env.NODE_ENV === 'production') {
+      console.error('Check Render database environment variables:');
+      console.error('1. DB_HOST, DB_USER, DB_PASSWORD, DB_NAME');
+    }
   } else {
-    console.log('✅ Connected to PostgreSQL database');
-    release();
+    console.log('✅ Connected to MySQL database');
+    connection.release();
   }
 });
 
-// Helper function for queries
-const query = (text, params) => {
-  return pool.query(text, params);
-};
-
-module.exports = {
-  query,
-  pool
-};
+module.exports = db;
