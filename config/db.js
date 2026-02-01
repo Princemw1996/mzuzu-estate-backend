@@ -1,31 +1,48 @@
-const mysql = require('mysql2');
+// config/db.js
+const { Pool } = require('pg');
+require('dotenv').config();
 
-// Use environment variables for production
-const dbConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '1234',
-  database: process.env.DB_NAME || 'mzuzu_estate',
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined
-};
+const isProduction = process.env.NODE_ENV === 'production';
 
-const db = mysql.createPool(dbConfig);
+let poolConfig;
+
+if (isProduction) {
+  // For Render PostgreSQL
+  poolConfig = {
+    connectionString: process.env.DATABASE_URL,
+    ssl: {
+      rejectUnauthorized: false
+    }
+  };
+} else {
+  // For local development
+  poolConfig = {
+    host: process.env.DB_HOST || 'localhost',
+    user: process.env.DB_USER || 'postgres',
+    password: process.env.DB_PASSWORD || '1234',
+    database: process.env.DB_NAME || 'mzuzu_estate',
+    port: process.env.DB_PORT || 5432
+  };
+}
+
+const pool = new Pool(poolConfig);
 
 // Test the connection
-db.getConnection((err, connection) => {
+pool.connect((err, client, release) => {
   if (err) {
     console.error('❌ Database connection error:', err.message);
-    if (process.env.NODE_ENV === 'production') {
-      console.error('Check Render database environment variables:');
-      console.error('1. DB_HOST, DB_USER, DB_PASSWORD, DB_NAME');
-    }
+    console.error('If using Render PostgreSQL:');
+    console.error('1. Go to Render Dashboard');
+    console.error('2. Navigate to your service');
+    console.error('3. Click on "Environment" tab');
+    console.error('4. Add DATABASE_URL from your PostgreSQL database');
   } else {
-    console.log('✅ Connected to MySQL database');
-    connection.release();
+    console.log('✅ Connected to PostgreSQL database');
+    release();
   }
 });
 
-module.exports = db;
+module.exports = {
+  query: (text, params) => pool.query(text, params),
+  pool
+};
